@@ -6,8 +6,6 @@ with open(constants.root_dir + '\\utils\\labels') as f:
 labels = [x.strip() for x in labels]
 labels = ["nothing"] + labels
 
-tf.app.flags.DEFINE_string('image_path', 'images\\cherryWaxYellow.jpg', 'Path to image')
-FLAGS = tf.app.flags.FLAGS
 
 
 # load image
@@ -47,34 +45,42 @@ def process_image(sess, X, softmax, keep_prob, image, image_height, image_width,
     img = tf.reshape(img, [-1, 100 * 100 * 4])
     rez, prob = predict(sess, X, softmax, keep_prob, img)
     print('Label index: %d - Label: %s - Probability: %.4f' % (rez, labels[rez[0]], prob))
+    return labels[rez[0]]
 
+def Run(file):
+    tf.app.flags.DEFINE_string('image_path',file, 'Path to image')
+    FLAGS = tf.app.flags.FLAGS
+    with tf.Session() as sess:
+        image_path = FLAGS.image_path
+        image_reader = tf.WholeFileReader()
 
-with tf.Session() as sess:
-    image_path = FLAGS.image_path
-    image_reader = tf.WholeFileReader()
+        # restore the trained model from the saved checkpoint; provide the path to the meta file
+        saver = tf.train.import_meta_graph(constants.fruit_models_dir + 'model.ckpt.meta')
+        print(constants.fruit_models_dir)
+        # provide the path to the folder containing the checkpoints
+        saver.restore(sess, tf.train.latest_checkpoint(constants.fruit_models_dir))
+        graph = tf.get_default_graph()
 
-    # restore the trained model from the saved checkpoint; provide the path to the meta file
-    saver = tf.train.import_meta_graph(constants.fruit_models_dir + 'model.ckpt.meta')
-    # provide the path to the folder containing the checkpoints
-    saver.restore(sess, tf.train.latest_checkpoint(constants.fruit_models_dir))
-    graph = tf.get_default_graph()
+        # to obtain a tensor from the saved model, we must get it by name, which is why we name the tensors when we create them
+        # even if there is only one tensor with a name, in the meta and checkpoint files it is saved as an array, so we have to provide the index of the
+        # tensor that we want to get -> thus we call "get_tensor_by_name(tensor_name:0)"
 
-    # to obtain a tensor from the saved model, we must get it by name, which is why we name the tensors when we create them
-    # even if there is only one tensor with a name, in the meta and checkpoint files it is saved as an array, so we have to provide the index of the
-    # tensor that we want to get -> thus we call "get_tensor_by_name(tensor_name:0)"
+        # obtain the input tensor by name
+        X = graph.get_tensor_by_name('X:0')
+        # obtain the keep_prob tensor
+        keep_prob = graph.get_tensor_by_name('keep_prob:0')
+        # obtain the output layer by name and apply softmax on in in order to obtain an output of probabilities
+        softmax = tf.nn.softmax(graph.get_tensor_by_name('softmax:0'))
 
-    # obtain the input tensor by name
-    X = graph.get_tensor_by_name('X:0')
-    # obtain the keep_prob tensor
-    keep_prob = graph.get_tensor_by_name('keep_prob:0')
-    # obtain the output layer by name and apply softmax on in in order to obtain an output of probabilities
-    softmax = tf.nn.softmax(graph.get_tensor_by_name('softmax:0'))
+        image, height, width, depth = read_image(image_path, image_reader)
+        coord = tf.train.Coordinator()
+        threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+        Ans=process_image(sess, X, softmax, keep_prob, image, height, width, depth)
 
-    image, height, width, depth = read_image(image_path, image_reader)
-    coord = tf.train.Coordinator()
-    threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-    process_image(sess, X, softmax, keep_prob, image, height, width, depth)
+        coord.request_stop()
+        coord.join(threads)
+        sess.close()
+        tf.flags.FLAGS.__delattr__('image_path')
+        return Ans
 
-    coord.request_stop()
-    coord.join(threads)
-    sess.close()
+Run("images//Apple2.jpg")

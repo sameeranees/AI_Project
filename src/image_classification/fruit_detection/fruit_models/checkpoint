@@ -1,0 +1,2 @@
+model_checkpoint_path: "C:\\Users\\samee\\Documents\\AI_Project\\src\\image_classification\\fruit_detection\\fruit_models\\model.ckpt"
+all_model_checkpoint_paths: "C:\\Users\\samee\\Documents\\AI_Project\\src\\image_classification\\fruit_detection\\fruit_models\\model.ckpt"
